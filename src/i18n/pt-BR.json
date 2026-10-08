@@ -1,0 +1,61 @@
+{
+  "ui": {
+    "dashboard": {
+      "artilharia": "Artilharia",
+      "bilheteria": "Bilheteria",
+      "caixa": "Caixa",
+      "clube": "Clube",
+      "colunaVazio": "Selecione uma liga para ver os dados",
+      "dataRodada": "Data da rodada",
+      "despesas": "Despesas",
+      "elenco": "Elenco",
+      "elencoMedio": "Elenco (geral)",
+      "gerar": "Gerar mundo",
+      "seed": "Seed",
+      "folha": "Folha salarial",
+      "geral": "Geral",
+      "gols": "Gols",
+      "idade": "Idade",
+      "jogos": "J",
+      "jogosRestantes": "Rodadas restantes",
+      "liga": "Liga",
+      "manutencao": "Manutencao",
+      "mandante": "Mandante",
+      "mediaGols": "Media de gols por jogo",
+      "orcamento": "Orcamento",
+      "patrocinio": "Patrocinio",
+      "pontos": "Pts",
+      "posicao": "Posicao",
+      "potencial": "Potencial",
+      "proximoJogo": "Proximo jogo",
+      "receitas": "Receitas",
+      "rodada": "Rodada",
+      "salario": "Salario",
+      "saldo": "SG",
+      "semClube": "Selecione um clube",
+      "simularRodada": "Simular rodada",
+      "simularTemporada": "Simular temporada",
+      "staff": "Staff",
+      "temporadaEncerrada": "Temporada encerrada",
+      "titulo": "Painel do clube",
+      "totalJogos": "Jogos disputados",
+      "transmissao": "Transmissao",
+      "ultimosResultados": "Ultimos resultados",
+      "visitante": "Visitante"
+    },
+    "elenco": {
+      "coluna": {
+        "geral": "Geral",
+        "nome": "Nome",
+        "posicao": "Posicao",
+        "salario": "Salario"
+      },
+      "titulo": "Escalacao"
+    },
+    "menu": {
+      "carregando": "Gerando o mundo...",
+      "erro": "Nao foi possivel gerar o mundo",
+      "titulo": "Football Manager"
+    }
+  }
+}

@@ -1,225 +1,232 @@
 /**
- * Calendário próprio do jogo.
- * Não usa Date do sistema — garante determinismo total por seed.
- * Suporta múltiplas ligas com calendários diferentes (europeu vs brasileiro).
+ * Calendario proprio do jogo, sem depender de `Date` do sistema.
+ *
+ * Motivo: `Date` depende de fuso horario e locale da maquina, o que quebraria o
+ * determinismo por seed. Aqui usamos aritmetica civil pura (algoritmo de
+ * Howard Hinnant) sobre numeros de dia.
  */
 
-export type LigaId = "ENG" | "ESP" | "ITA" | "BRA";
-
-export interface DataJogo {
+/** Data civil, no formato usado em todo o save e na UI. */
+export interface Data {
   ano: number;
-  mes: number;      // 1-12
-  dia: number;      // 1-31
-  diaSemana: number; // 0=Dom ... 6=Sab
+  mes: number;
+  dia: number;
 }
 
-/**
- * Converte DataJogo para número de dias desde epoch do jogo (01/01/2020).
- * Usado para ordenação e aritmética de datas.
- */
-export function dataParaDias(d: DataJogo): number {
-  // Algoritmo de dias desde 01/01/2020 (ano base do jogo)
-  const anoBase = 2020;
-  let dias = 0;
-  for (let a = anoBase; a < d.ano; a++) {
-    dias += ehBissexto(a) ? 366 : 365;
-  }
-  const diasMes = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  if (ehBissexto(d.ano)) diasMes[2] = 29;
-  for (let m = 1; m < d.mes; m++) dias += diasMes[m];
-  dias += d.dia - 1;
-  return dias;
-}
+/** Dias desde 1970-01-01 (que foi uma quinta-feira). */
+export type DiaNumero = number;
+
+const DIAS_POR_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+const NOMES_DIAS = [
+  "domingo",
+  "segunda-feira",
+  "terca-feira",
+  "quarta-feira",
+  "quinta-feira",
+  "sexta-feira",
+  "sabado"
+];
+
+const NOMES_MESES = [
+  "janeiro",
+  "fevereiro",
+  "marco",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro"
+];
 
 function ehBissexto(ano: number): boolean {
   return (ano % 4 === 0 && ano % 100 !== 0) || ano % 400 === 0;
 }
 
-export function diasParaData(dias: number): DataJogo {
-  let ano = 2020;
-  while (true) {
-    const diasNoAno = ehBissexto(ano) ? 366 : 365;
-    if (dias < diasNoAno) break;
-    dias -= diasNoAno;
-    ano++;
-  }
-  const diasMes = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  if (ehBissexto(ano)) diasMes[2] = 29;
-  let mes = 1;
-  while (dias >= diasMes[mes]) {
-    dias -= diasMes[mes];
-    mes++;
-  }
-  const dia = dias + 1;
-  // 01/01/2020 foi quarta-feira (3)
-  const diaSemana = (3 + dataParaDias({ ano, mes, dia, diaSemana: 0 })) % 7;
-  return { ano, mes, dia, diaSemana };
-}
-
-export function adicionarDias(d: DataJogo, n: number): DataJogo {
-  return diasParaData(dataParaDias(d) + n);
-}
-
-export function proximoSabado(d: DataJogo): DataJogo {
-  const diff = (6 - d.diaSemana + 7) % 7;
-  return diff === 0 ? d : adicionarDias(d, diff);
-}
-
-export function formatarData(d: DataJogo, locale = "pt-BR"): string {
-  return new Date(d.ano, d.mes - 1, d.dia).toLocaleDateString(locale, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
-}
-
-export function formatarDataLonga(d: DataJogo, locale = "pt-BR"): string {
-  return new Date(d.ano, d.mes - 1, d.dia).toLocaleDateString(locale, {
-    day: "2-digit",
-    month: "long",
-    year: "numeric"
-  });
-}
-
-/** Comparação: -1 se a < b, 0 se igual, 1 se a > b */
-export function compararDatas(a: DataJogo, b: DataJogo): number {
-  if (a.ano !== b.ano) return a.ano < b.ano ? -1 : 1;
-  if (a.mes !== b.mes) return a.mes < b.mes ? -1 : 1;
-  if (a.dia !== b.dia) return a.dia < b.dia ? -1 : 1;
-  return 0;
-}
-
-export function datasIguais(a: DataJogo, b: DataJogo): boolean {
-  return a.ano === b.ano && a.mes === b.mes && a.dia === b.dia;
+/**
+ * Converte data civil para numero de dias desde 1970-01-01.
+ * Algoritmo de Hinnant (`days_from_civil`), exato para +-500000 anos.
+ *
+ * @param data - data civil
+ * @returns numero de dias
+ */
+export function paraDiaNumero(data: Data): DiaNumero {
+  const a = data.mes <= 2 ? data.ano - 1 : data.ano;
+  const m = data.mes + (data.mes > 2 ? -3 : 9);
+  const era = Math.floor(a / 400);
+  const anoEra = a - era * 400;
+  const diaEra =
+    Math.floor((153 * m + 2) / 5) + data.dia - 1;
+  const diaAno = anoEra * 365 + Math.floor(anoEra / 4) - Math.floor(anoEra / 100) + diaEra;
+  return era * 146097 + diaAno - 719468;
 }
 
 /**
- * Configuração de calendário por liga.
- * Define início/fim da temporada, pausas, janelas de transferência.
+ * Converte numero de dias para data civil (inverso de `paraDiaNumero`).
+ *
+ * @param dia - numero de dias desde 1970-01-01
+ * @returns data civil
  */
-export interface ConfigCalendarioLiga {
-  ligaId: LigaId;
-  inicioTemporada: DataJogo;        // 2º sábado de agosto (ENG/ESP/ITA) ou maio (BRA)
-  fimTemporada: DataJogo;           // último sábado de maio (ENG/ESP/ITA) ou dezembro (BRA)
-  pausaInvernoInicio?: DataJogo;    // para ligas europeias
-  pausaInvernoFim?: DataJogo;
-  janelaVeraoInicio: DataJogo;
-  janelaVeraoFim: DataJogo;
-  janelaInvernoInicio: DataJogo;
-  janelaInvernoFim: DataJogo;
-  rodadas: number;                  // 38 para todas
+export function paraData(dia: DiaNumero): Data {
+  const z = dia + 719468;
+  const era = Math.floor(z / 146097);
+  const diaEra = z - era * 146097;
+  const anoEra = Math.floor(
+    (diaEra - Math.floor(diaEra / 1460) + Math.floor(diaEra / 36524) - Math.floor(diaEra / 146096)) / 365
+  );
+  const ano = anoEra + era * 400;
+  const diaAno = diaEra - (365 * anoEra + Math.floor(anoEra / 4) - Math.floor(anoEra / 100));
+  const mp = Math.floor((5 * diaAno + 2) / 153);
+  const dia = diaAno - Math.floor((153 * mp + 2) / 5) + 1;
+  const mes = mp + (mp < 10 ? 3 : -9);
+  return { ano: ano + (mes <= 2 ? 1 : 0), mes, dia };
 }
 
-/** Gera configuração padrão para uma liga e ano */
-export function gerarConfigCalendario(ligaId: LigaId, anoInicio: number): ConfigCalendarioLiga {
-  // 2º sábado de agosto
-  let inicio = { ano: anoInicio, mes: 8, dia: 1, diaSemana: 0 };
-  inicio = diasParaData(dataParaDias(inicio));
-  inicio = proximoSabado(inicio); // 1º sábado
-  inicio = adicionarDias(inicio, 7); // 2º sábado
+/** Indice do dia da semana (0 = domingo). 1970-01-01 foi quinta-feira. */
+export function indiceDiaSemana(dia: DiaNumero): number {
+  return (((dia + 4) % 7) + 7) % 7;
+}
 
-  let fim: DataJogo;
-  let janelaVeraoFim: DataJogo;
-  let janelaInvernoInicio: DataJogo;
-  let janelaInvernoFim: DataJogo;
+/** Nome do dia da semana em portugues. */
+export function nomeDiaSemana(dia: DiaNumero): string {
+  return NOMES_DIAS[indiceDiaSemana(dia)] as string;
+}
 
-  if (ligaId === "BRA") {
-    // Brasileirão: maio a dezembro
-    fim = { ano: anoInicio, mes: 12, dia: 1, diaSemana: 0 };
-    fim = diasParaData(dataParaDias(fim));
-    fim = proximoSabado(fim);
-    // último sábado de dezembro
-    while (fim.mes === 12) {
-      const prox = adicionarDias(fim, 7);
-      if (prox.mes !== 12) break;
-      fim = prox;
-    }
-    janelaVeraoFim = { ano: anoInicio, mes: 4, dia: 1, diaSemana: 0 };
-    janelaVeraoFim = diasParaData(dataParaDias(janelaVeraoFim));
-    janelaInvernoInicio = { ano: anoInicio, mes: 7, dia: 1, diaSemana: 0 };
-    janelaInvernoInicio = diasParaData(dataParaDias(janelaInvernoInicio));
-    janelaInvernoFim = { ano: anoInicio, mes: 8, dia: 1, diaSemana: 0 };
-    janelaInvernoFim = diasParaData(dataParaDias(janelaInvernoFim));
-  } else {
-    // Europeias: agosto a maio do ano seguinte
-    fim = { ano: anoInicio + 1, mes: 5, dia: 1, diaSemana: 0 };
-    fim = diasParaDias(fim);
-    fim = diasParaData(fim);
-    fim = proximoSabado(fim);
-    while (fim.mes === 5) {
-      const prox = adicionarDias(fim, 7);
-      if (prox.mes !== 5) break;
-      fim = prox;
-    }
-    janelaVeraoFim = { ano: anoInicio, mes: 9, dia: 1, diaSemana: 0 };
-    janelaVeraoFim = diasParaData(dataParaDias(janelaVeraoFim));
-    janelaInvernoInicio = { ano: anoInicio + 1, mes: 1, dia: 1, diaSemana: 0 };
-    janelaInvernoInicio = diasParaData(dataParaDias(janelaInvernoInicio));
-    janelaInvernoFim = { ano: anoInicio + 1, mes: 2, dia: 1, diaSemana: 0 };
-    janelaInvernoFim = diasParaData(dataParaDias(janelaInvernoFim));
+/** Nome do mes em portugues. */
+export function nomeMes(mes: number): string {
+  return NOMES_MESES[mes - 1] as string;
+}
+
+/**
+ * Formata a data no padrao ISO curto (AAAA-MM-DD), que e o formato do save.
+ */
+export function formatarIso(dia: DiaNumero): string {
+  const d = paraData(dia);
+  const mes = String(d.mes).padStart(2, "0");
+  const dd = String(d.dia).padStart(2, "0");
+  return `${d.ano}-${mes}-${dd}`;
+}
+
+/**
+ * Formata a data por extenso: "12 de agosto de 2025".
+ */
+export function formatarExtenso(dia: DiaNumero): string {
+  const d = paraData(dia);
+  return `${d.dia} de ${nomeMes(d.mes)} de ${d.ano}`;
+}
+
+/**
+ * Formata no padrao curto de tela: "12/08/2025".
+ */
+export function formatarCurto(dia: DiaNumero): string {
+  const d = paraData(dia);
+  return `${String(d.dia).padStart(2, "0")}/${String(d.mes).padStart(2, "0")}/${d.ano}`;
+}
+
+/**
+ * Soma dias a uma data, sem depender de `Date`.
+ *
+ * @param dia - data inicial
+ * @param quantidade - quantos dias somar (pode ser negativo)
+ * @returns novo numero de dias
+ */
+export function somarDias(dia: DiaNumero, quantidade: number): DiaNumero {
+  return dia + quantidade;
+}
+
+/** Diferenca em dias entre duas datas. */
+export function diferencaDias(a: DiaNumero, b: DiaNumero): number {
+  return b - a;
+}
+
+/**
+ * Encontra o primeiro dia do mes.
+ *
+ * @param ano - ano
+ * @param mes - mes (1 a 12)
+ * @returns numero de dias do dia 1
+ */
+export function primeiroDiaDoMes(ano: number, mes: number): DiaNumero {
+  return paraDiaNumero({ ano, mes, dia: 1 });
+}
+
+/**
+ * Quantos dias o mes tem (considera bissexto).
+ */
+export function diasNoMes(ano: number, mes: number): number {
+  if (mes === 2 && ehBissexto(ano)) {
+    return 29;
   }
-
-  const pausaInicio = { ano: anoInicio, mes: 12, dia: 20, diaSemana: 0 };
-  const pausaFim = { ano: anoInicio + 1, mes: 1, dia: 5, diaSemana: 0 };
-  const pausaInicioDias = dataParaDias(pausaInicio);
-  const pausaFimDias = dataParaDias(pausaFim);
-  const pausaInvernoInicioObj = diasParaData(pausaInicioDias);
-  const pausaInvernoFimObj = diasParaData(pausaFimDias);
-
-  return {
-    ligaId,
-    inicioTemporada: inicio,
-    fimTemporada: fim,
-    pausaInvernoInicio: ligaId !== "BRA" ? pausaInvernoInicioObj : undefined,
-    pausaInvernoFim: ligaId !== "BRA" ? pausaInvernoFimObj : undefined,
-    janelaVeraoInicio: inicio,
-    janelaVeraoFim,
-    janelaInvernoInicio: janelaInvernoInicioObj,
-    janelaInvernoFim: janelaInvernoFimObj,
-    rodadas: 38
-  };
+  return DIAS_POR_MES[mes - 1] as number;
 }
 
-/** Verifica se uma data está na janela de transferências */
-export function estaNaJanela(
-  data: DataJogo,
-  config: ConfigCalendarioLiga,
-  tipo: "verao" | "inverno"
-): boolean {
-  const d = dataParaDias(data);
-  if (tipo === "verao") {
-    return d >= dataParaDias(config.janelaVeraoInicio) && d <= dataParaDias(config.janelaVeraoFim);
-  }
-  return d >= dataParaDias(config.janelaInvernoInicio) && d <= dataParaDias(config.janelaInvernoFim);
+/**
+ * Encontra o proximo dia da semana desejado a partir de uma data (inclusive).
+ *
+ * @param dia - data inicial
+ * @param indice - 0 = domingo ... 6 = sabado
+ * @returns numero de dias do proximo sabado (ou outro dia)
+ */
+export function proximoDiaDaSemana(dia: DiaNumero, indice: number): DiaNumero {
+  const atual = indiceDiaSemana(dia);
+  return dia + (((indice - atual) % 7) + 7) % 7;
 }
 
-/** Verifica se é dia de rodada (sábado ou domingo) */
-export function ehDiaDeRodada(data: DataJogo): boolean {
-  return data.diaSemana === 6 || data.diaSemana === 0;
-}
+/**
+ * Constroi o calendario de uma temporada: 38 rodadas com uma data por rodada.
+ *
+ * Regra do projeto: a temporada comeca no 2o sabado de agosto e cada rodada
+ * acontece exatamente 7 dias depois da anterior.
+ *
+ * @param anoTemporada - ano de inicio da temporada (ex.: 2025)
+ * @param quantidade - numero de rodadas (38 na liga)
+ * @returns vetor de datas, uma por rodada
+ */
+export function calendarioTemporada(
+  anoTemporada: number,
+  quantidade: number
+): DiaNumero[] {
+  const primeiroDeAgosto = primeiroDiaDoMes(anoTemporada, 8);
+  const primeiroSabado = proximoDiaDaSemana(primeiroDeAgosto, 6);
+  // 2o sabado de agosto: soma mais 7 dias
+  const inicio = primeiroSabado + 7;
 
-/** Gera todas as datas das rodadas para uma liga */
-export function gerarDatasRodadas(config: ConfigCalendarioLiga): DataJogo[] {
-  const datas: DataJogo[] = [];
-  let atual = config.inicioTemporada;
-  for (let i = 0; i < config.rodadas; i++) {
-    // Avança para o próximo fim de semana
-    while (!ehDiaDeRodada(atual)) {
-      atual = adicionarDias(atual, 1);
-    }
-    datas.push({ ...atual });
-    // Próxima rodada: 7 dias depois (alternando sáb/dom se quiser)
-    atual = adicionarDias(atual, 7);
-    // Pula pausa de inverno se houver
-    if (config.pausaInvernoInicio && config.pausaInvernoFim) {
-      const ini = dataParaDias(config.pausaInvernoInicio);
-      const fim = dataParaDias(config.pausaInvernoFim);
-      const at = dataParaDias(atual);
-      if (at >= ini && at <= fim) {
-        atual = { ...config.pausaInvernoFim };
-        atual = adicionarDias(atual, 1);
-      }
-    }
+  const datas: DiaNumero[] = [];
+  for (let i = 0; i < quantidade; i += 1) {
+    datas.push(inicio + i * 7);
   }
   return datas;
+}
+
+/**
+ * Quantos dias faltam entre a data atual e a data-alvo (0 se ja passou).
+ */
+export function diasAte(atual: DiaNumero, alvo: DiaNumero): number {
+  return Math.max(0, alvo - atual);
+}
+
+/** Compara duas datas: negativo se `a` vem antes. */
+export function compararDatas(a: DiaNumero, b: DiaNumero): number {
+  return a === b ? 0 : a < b ? -1 : 1;
+}
+
+/** Serializa um dia para texto, para o save. */
+export function diaParaTexto(dia: DiaNumero): string {
+  return formatarIso(dia);
+}
+
+/** Le um dia serializado. */
+export function textoParaDia(texto: string): DiaNumero {
+  const partes = texto.split("-");
+  const ano = Number(partes[0]);
+  const mes = Number(partes[1]);
+  const dd = Number(partes[2]);
+  if (!Number.isFinite(ano) || !Number.isFinite(mes) || !Number.isFinite(dd)) {
+    throw new Error(`textoParaDia: data invalida "${texto}"`);
+  }
+  return paraDiaNumero({ ano, mes, dia: dd });
 }

@@ -1,34 +1,28 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "useDefineForClassFields": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
+    "noImplicitOverride": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "types": ["node", "vitest/globals"],
     "baseUrl": ".",
     "paths": {
-      "@core/*": ["src/core/*"],
-      "@sim/*": ["src/sim/*"],
-      "@domain/*": ["src/domain/*"],
-      "@data/*": ["src/data/*"],
-      "@systems/*": ["src/systems/*"],
-      "@ui/*": ["src/ui/*"],
-      "@content/*": ["src/content/*"]
+      "@/*": ["src/*"]
     }
   },
-  "include": ["src", "scripts"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src", "tools", "tests", "vite.config.ts", "eslint.config.js"]
 }

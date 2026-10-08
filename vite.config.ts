@@ -1,27 +1,22 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
-import path from "path";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@core": path.resolve(__dirname, "src/core"),
-      "@sim": path.resolve(__dirname, "src/sim"),
-      "@domain": path.resolve(__dirname, "src/domain"),
-      "@data": path.resolve(__dirname, "src/data"),
-      "@systems": path.resolve(__dirname, "src/systems"),
-      "@ui": path.resolve(__dirname, "src/ui"),
-      "@content": path.resolve(__dirname, "src/content")
+      "@": fileURLToPath(new URL("./src", import.meta.url))
     }
   },
   build: {
     target: "es2022",
-    minify: "esbuild",
     sourcemap: true
   },
-  server: {
-    port: 3000,
-    open: true
+  test: {
+    globals: true,
+    environment: "node",
+    include: ["tests/**/*.test.ts"],
+    reporters: ["default"]
   }
 });
